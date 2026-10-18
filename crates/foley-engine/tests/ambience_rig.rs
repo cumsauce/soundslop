@@ -40,6 +40,22 @@ fn single_layer_is_bounded_and_nonzero() {
         layers[0].gain = 0.5;
         layers[0].seed = 7;
     }
+    // Wait for the rebuilder worker to construct + deliver the Rain bed. The
+    // pump loop runs in microseconds of wall time, so without an explicit
+    // yield the worker may never be scheduled (fails under parallel test
+    // load). Same pattern as kind_swap_rebuilds_without_panic below.
+    let mut installed = false;
+    for _ in 0..10_000 {
+        let (_, finite) = pump(&mut rig, 256);
+        assert!(finite, "output went non-finite while waiting for Rain bed");
+        if rig.layer_kind(0) == Some(BedKind::Rain) {
+            installed = true;
+            break;
+        }
+        std::thread::yield_now();
+    }
+    assert!(installed, "Rain bed never installed");
+
     let (peak, finite) = pump(&mut rig, 2 * RATE as usize);
     assert!(finite);
     assert!(peak > 0.01, "expected audible output, peak {peak}");

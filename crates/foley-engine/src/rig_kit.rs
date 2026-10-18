@@ -244,7 +244,10 @@ impl KitRig {
         self.pickup_clips();
         left[..n].fill(0.0);
         right[..n].fill(0.0);
-        let mut done: Vec<usize> = Vec::new();
+        // Fixed-size buffer: `MAX_VOICES` voices can each finish at most once
+        // per block, so this never overflows and never allocates (RT-safe).
+        let mut done = [0usize; MAX_VOICES];
+        let mut done_len = 0usize;
         for (vi, voice) in self.voices.iter_mut().enumerate() {
             let VoiceState::Playing {
                 clip,
@@ -279,10 +282,11 @@ impl KitRig {
                 k += 1;
             }
             if *pos >= total {
-                done.push(vi);
+                done[done_len] = vi;
+                done_len += 1;
             }
         }
-        for vi in done {
+        for &vi in &done[..done_len] {
             if let VoiceState::Playing { clip, .. } =
                 std::mem::replace(&mut self.voices[vi].state, VoiceState::Free)
             {

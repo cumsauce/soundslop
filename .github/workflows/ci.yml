@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Lint & test (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # The foley repo (github.com/cumsauce/foley) is public, so cargo's git
+      # deps clone without credentials. The committed [patch] section points at
+      # a sibling ../foley checkout, which doesn't exist in CI — drop it so the
+      # git deps at the pinned rev are used instead.
+      - name: Drop dev-only sibling [patch] section
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          p = pathlib.Path("Cargo.toml")
+          text = p.read_text()
+          # Remove the [patch."https://github.com/cumsauce/foley"] section.
+          text = re.sub(
+              r'\n\[patch\."https://github\.com/cumsauce/foley"\][^\[]*',
+              "\n",
+              text,
+          )
+          p.write_text(text)
+          EOF
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+      - name: Test
+        run: cargo test --workspace
+
+  bundle:
+    name: Bundle (macOS universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Drop dev-only sibling [patch] section
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib
+          p = pathlib.Path("Cargo.toml")
+          text = p.read_text()
+          text = re.sub(
+              r'\n\[patch\."https://github\.com/cumsauce/foley"\][^\[]*',
+              "\n",
+              text,
+          )
+          p.write_text(text)
+          EOF
+      - name: Build universal bundles
+        run: |
+          cargo xtask bundle-universal foley-kit --release
+          cargo xtask bundle-universal foley-ambience --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soundslop-bundles
+          path: target/bundled/
