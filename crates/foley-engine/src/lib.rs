@@ -1,10 +1,16 @@
 //! Shared engine constants and re-exports for the Soundslop plugins.
 
 mod bed_union;
+mod guard;
 mod kind_map;
+mod motion;
+mod spatial;
 
 pub use bed_union::{BedKind, BedUnion, new_bed};
+pub use guard::GainGuard;
 pub use kind_map::knob_labels;
+pub use motion::Motion;
+pub use spatial::{OnePoleLpf, layer_cutoff, pan_gains};
 
 pub const MAX_BLOCK: usize = 512;
 pub const MAX_VOICES: usize = 16;
