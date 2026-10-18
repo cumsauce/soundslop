@@ -16,10 +16,10 @@ seeded and deterministic. None of it depends on Minecraft, Java, FFI, or audio I
 only game-shaped piece is the C-ABI shim `foley-ffi`. A standalone DAW plugin can therefore
 link the DSP crates **directly** and expose two musical surfaces:
 
-1. **Foley Kit** — a MIDI instrument that plays the one-shots (impacts, drips, bells,
+1. **Soundslop Kit** — a MIDI instrument that plays the one-shots (impacts, drips, bells,
    bird/cricket/frog/bug sounds, mob calls, note-block instruments) with per-hit seed
    variation, like a sampler of procedurally generated field recordings.
-2. **Foley Ambience** — an always-running generative soundscape: up to 6 layers, each an
+2. **Soundslop Ambience** — an always-running generative soundscape: up to 6 layers, each an
    assignable bed (Rain/Wind/Water/Fire/Lava/Cave/Underwater/Thunder/Biome/Surf) with
    spatial placement (azimuth + distance with air absorption), per-layer scene "macro"
    knobs, automatable everything, and a slow random-walk "motion" so scenes evolve.
@@ -216,9 +216,8 @@ on Codeberg; not on crates.io, git dep required):
    - All workspace deps: `rev = "<PIN>"` where `<PIN>` is the merged post-Option-A HEAD
      on foley's `master` (the plan's Phase 0 produces that commit; the pin task uses its
      exact SHA).
-   - CI: cloning the (possibly private) foley repo needs a read-scoped PAT secret or a
-     public repo — flagged to the author in the plan; local patching keeps dev friction
-     at zero.
+   - CI: the foley repo is public — git deps clone without credentials, so CI needs no
+     PAT; local patching keeps dev friction at zero.
    - Phase 0 (the Option-A refactor) lands as a branch off foley `master`. The tree at
      `5020db4` is dirty with in-flight ABI-25/BOOM work in `foley-ffi/src/lib.rs` and
      `foley-synth/src/{lib.rs,oneshot.rs}` — Phase 0 must not clobber it: if that work
@@ -297,14 +296,14 @@ library-unload policy stays exactly as it is.
 ## 8. Repo / crate layout (also see the plan's File Structure)
 
 ```
-foley-plugin/                     (new repo; name provisional — the GitHub target would be cumsauce/foley-plugin)
+soundslop/                        (repo: cumsauce/soundslop)
   Cargo.toml                      [workspace] resolver 3, edition 2024, rust-version 1.99, publish = false, [lints] unsafe deny
   bundler.toml                    human-readable display names for bundling
   xtask/                          2-line wrapper: `nih_plug_xtask::main()`
   crates/
     foley-engine/                 no nih_plug dep: bed rigs, spatialization, guards, clip worker, motion, warmup
-    foley-kit/                    "Foley Kit" plugin (instrument; MIDI one-shot voice bank)
-    foley-ambience/               "Foley Ambience" plugin (soundscape layer machine)
+    foley-kit/                    "Soundslop Kit" plugin (instrument; MIDI one-shot voice bank)
+    foley-ambience/               "Soundslop Ambience" plugin (soundscape layer machine)
   docs/superpowers/{specs,plans}/
   .github/workflows/ci.yml        build + tests + rt-probe + bundle matrix
 ```
@@ -361,7 +360,7 @@ foley-plugin/                     (new repo; name provisional — the GitHub tar
   built `TABLES` (init'd by warm-up), which is immutable-after-init, which is exactly
   safe for multi-instance use.
 
-## 10. Parameter model: Foley Ambience
+## 10. Parameter model: Soundslop Ambience
 
 For layer i ∈ 1..=6 (param ids `l{i}_kind`, `l{i}_gain`, `l{i}_seed`, `l{i}_motion_amt`,
 `l{i}_motion_rate`, `l{i}_dist`, `l{i}_az`, `l{i}_knob_a`, `l{i}_knob_b`, `l{i}_knob_c`,
@@ -407,7 +406,7 @@ smoother's). The global `SUBMERGED` LPF from foley-ffi is deliberately dropped (
 underwater comes from the `Underwater` layer and per-layer distance LPF. v1 total =
 6 layers × 11 + 2 = **68 params**.
 
-## 11. Parameter model: Foley Kit
+## 11. Parameter model: Soundslop Kit
 
 For slot i ∈ 1..=8 (ids `s{i}_category`, `s{i}_kind`, `s{i}_voice_mob`, `s{i}_note`,
 `s{i}_knob_a`, `s{i}_knob_b`, `s{i}_gain`, `s{i}_pan`, `s{i}_seed`, `s{i}_fresh`):
@@ -465,8 +464,8 @@ Both plugin crates export both formats:
 nih_export_clap!(Kit); nih_export_vst3!(Kit);
 ```
 
-CLAP IDs are reverse-DNS: `"io.github.cumsauce.foley.kit"` and
-`"io.github.cumsauce.foley.ambience"`.
+CLAP IDs are reverse-DNS: `"io.github.cumsauce.soundslop.kit"` and
+`"io.github.cumsauce.soundslop.ambience"`.
 
 VST3 category: `const VST3_SUBCATEGORIES: &[Vst3SubCategory] = &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth];`
 CLAP features: `&[ClapFeature::Instrument, ClapFeature::Synthesizer]` for both plugins
@@ -486,15 +485,16 @@ or derivable from them — so **soundscape presets = plugin state**, nothing exo
 
 ## 14. Platform / release / CI story
 
-- **Assumption: macOS Apple Silicon is the author's DAW machine.** v1 release = macOS
+- **Confirmed: macOS Apple Silicon is the author's DAW machine; primary host is
+  Bitwig (CLAP-first, VST3 secondary).** v1 release = macOS
   universal (aarch64 + x86_64) `.clap` + `.vst3` bundles via `cargo xtask
   bundle-universal <pkg> --release`, unsigned ("may need to disable Gatekeeper" —
   documented). Linux x86_64: CI-only "it builds and tests" (no real host tested).
   Windows: deferred task (xtask cross-compile story documented but not built).
 - CI: `clippy -D warnings` + tests + RT-alloc probe + `cargo xtask bundle -p <each>`
   on macOS; bundle artifacts saved per rev. No sibling foley checkout needed — git deps
-  pull from the pinned rev; private-repo note (PAT secret as a possible source) —
-  length: only if the foley repo stays private.
+  pull from the pinned rev, and the foley repo is public, so CI clones without
+  credentials.
 - VST3 license note as a release constraint: distributable only under GPLv3-compliant
   terms because of nih-plug's bundled vst3-sys.
 
@@ -510,9 +510,9 @@ or derivable from them — so **soundscape presets = plugin state**, nothing exo
   PIN it).
 - Note-block `note()` pitch ↔ MIDI mapping is fixed (MIDI note = `note: f32`); no
   transposition knobs in v1.
-- Anything about name/identity: "Foley Kit"/"Foley Ambience" display names, CLAP/VST3
-  IDs, and the repo name `foley-plugin` (with tag as 0.1.0) are provisional; the author
-  may rename without touching the architecture.
+- Name/identity is decided: repo `soundslop` (GitHub `cumsauce/soundslop`), display
+  names "Soundslop Kit"/"Soundslop Ambience", CLAP/VST3
+  IDs as in §12 (tags as 0.1.0).
 - Measured CPU budget assertions in tests are soft targets, not hard guarantees
   (hardware varies); the tests pin correctness (allocs/panics/NaN), the bench pins
   nothing that would fail a CI run.

@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship two nih-plug CLAP+VST3 plugins — **Foley Kit** (MIDI one-shot instrument) and **Foley Ambience** (6-layer generative soundscape) — that reuse the foley mod's Rust DSP crates directly, made possible by a behavior-preserving sample-rate refactor of those crates in place (spec §7, Option A).
+**Goal:** Ship two nih-plug CLAP+VST3 plugins — **Soundslop Kit** (MIDI one-shot instrument) and **Soundslop Ambience** (6-layer generative soundscape) — that reuse the foley mod's Rust DSP crates directly, made possible by a behavior-preserving sample-rate refactor of those crates in place (spec §7, Option A).
 
-**Architecture:** Phase 0 (Tasks 1–3) makes `foley-dsp`/`foley-synth` sample-rate-generic inside the **foley repo** (`/Volumes/My Shared Files/mc/foley`), mod bit-identical at 48 kHz, and produces the pinned rev. Then a new **plugin repo** (`/Volumes/My Shared Files/mc/foley-plugin`, this repo) consumes those pinned crates through `foley-engine` (no nih-plug dependency: bed wrapper `BedUnion`, knob→scene mapping, pan/LPF/guards/motion, one rebuild worker + one clip worker per instance, headless `AmbienceRig`/`KitRig`). The two plugin crates are thin nih-plug shells (params + process + egui editor) over the rigs. Audio threads never allocate; all construction/one-shot rendering happens on workers using thunder.rs's bounded-channel + `Job::Free` buffer-recycling pattern.
+**Architecture:** Phase 0 (Tasks 1–3) makes `foley-dsp`/`foley-synth` sample-rate-generic inside the **foley repo** (`/Volumes/My Shared Files/mc/foley`), mod bit-identical at 48 kHz, and produces the pinned rev. Then a new **plugin repo** (`/Volumes/My Shared Files/mc/soundslop`, this repo) consumes those pinned crates through `foley-engine` (no nih-plug dependency: bed wrapper `BedUnion`, knob→scene mapping, pan/LPF/guards/motion, one rebuild worker + one clip worker per instance, headless `AmbienceRig`/`KitRig`). The two plugin crates are thin nih-plug shells (params + process + egui editor) over the rigs. Audio threads never allocate; all construction/one-shot rendering happens on workers using thunder.rs's bounded-channel + `Job::Free` buffer-recycling pattern.
 
 **Tech Stack:** Rust 1.99 / edition 2024 / resolver 3, `#![deny(unsafe_code)]`; `nih_plug` + `nih_plug_egui` (egui 0.31) at git rev `de421011f41a6d10fc8c7a6084e4f4dee0143683`; `foley-math`/`foley-dsp`/`foley-synth` as git deps at `<PIN>` (Task 3 output); `rfd` for file dialogs; `nih_plug_xtask` for bundling.
 
-**Spec:** `docs/superpowers/specs/2026-10-18-foley-plugin-design.md` (all §-references below point there)
+**Spec:** `docs/superpowers/specs/2026-10-18-soundslop-design.md` (all §-references below point there)
 
 ## Global Constraints
 
-- Two repos: **foley repo** = `/Volumes/My Shared Files/mc/foley` (Tasks 1–3 run there); **plugin repo** = `/Volumes/My Shared Files/mc/foley-plugin` (Tasks 4–13, this repo). Paths in tasks are relative to the repo named in the task.
+- Two repos: **foley repo** = `/Volumes/My Shared Files/mc/foley` (Tasks 1–3 run there); **plugin repo** = `/Volumes/My Shared Files/mc/soundslop` (Tasks 4–13, this repo). Paths in tasks are relative to the repo named in the task.
 - Phase 0 must not clobber in-flight ABI-25/BOOM work (spec §6): before Task 1, `git status --porcelain` in the foley repo; if `foley-ffi/src/lib.rs` or `foley-synth/src/{lib.rs,oneshot.rs}` are still dirty, stop and ask the author. Commit only the rate-refactor hunks (`git add -p`).
 - foley dep pin: `rev = "<PIN>"` = merged post-Task-3 master SHA. Never link `foley-ffi`. Never fork the DSP crates.
 - nih-plug pin: `https://github.com/robbert-vdh/nih-plug` rev `de421011f41a6d10fc8c7a6084e4f4dee0143683` for both `nih_plug` and `nih_plug_egui`.
@@ -22,7 +22,7 @@
 - Engine constants: `MAX_BLOCK: usize = 512`, `MAX_VOICES: usize = 16`, `LAYER_CEILING: f32 = 0.4`, `MASTER_CEILING: f32 = 0.85`.
 - Both plugins: `ProcessStatus::KeepAlive` always, `HARD_REALTIME_ONLY = false`, `SAMPLE_ACCURATE_AUTOMATION = false`, `MidiConfig::Basic` (input). One worker thread per instance (`AmbienceRig`: rebuilder; `KitRig`: clip worker) + at most one Thunder thread per bed; all joined on Drop.
 - Param ids exactly as spec §10 (Ambience, 68: `l{i}_kind/gain/seed/motion_amt/motion_rate/dist/az/knob_a/knob_b/knob_c/knob_d` + `output_gain` + `scene_glide`) and §11 (Kit, 83: `s{i}_category/kind/voice_mob/note/knob_a/knob_b/gain/pan/seed/fresh` + `output_gain` + `polyphony` + `humanize`).
-- Ids: CLAP `io.github.cumsauce.foley.kit` / `io.github.cumsauce.foley.ambience`; VST3 class ids `*b"F0leyKit.0100001"` and `*b"F0leyAmbience.01"` (arbitrary but frozen); `VST3_SUBCATEGORIES = &[Instrument, Synth]`, `CLAP_FEATURES = &[Instrument, Synthesizer]` for both.
+- Ids: CLAP `io.github.cumsauce.soundslop.kit` / `io.github.cumsauce.soundslop.ambience`; VST3 class ids `*b"S0undslopKit.001"` and `*b"S0undslopAmb.001"` (arbitrary but frozen); `VST3_SUBCATEGORIES = &[Instrument, Synth]`, `CLAP_FEATURES = &[Instrument, Synthesizer]` for both.
 - License: repo is `GPL-3.0-or-later` (VST3 `vst3-sys` requirement, spec §2).
 - Ambience layer order (param `kind` variant order == foley.h): `Off, Rain, Wind, Water, Fire, Lava, Thunder, Cave, Underwater, Biome, Surf`.
 
@@ -251,12 +251,12 @@ Open/merge the PR to `master`. Record the merged master SHA as `<PIN>`; substitu
 
 ### Task 4: Plugin repo workspace scaffold + dependency pins
 
-**Repo:** plugin (`/Volumes/My Shared Files/mc/foley-plugin`).
+**Repo:** plugin (`/Volumes/My Shared Files/mc/soundslop`).
 
 **Files:**
 - Create: `Cargo.toml` (workspace: `members = ["xtask", "crates/*"]`, `resolver = "3"`, `[workspace.package] edition = "2024", rust-version = "1.99", publish = false`, `[workspace.lints.rust] unsafe_code = "deny"`; `[workspace.dependencies]` with the pins below)
 - Create: `xtask/Cargo.toml`, `xtask/src/main.rs` (`fn main() { nih_plug_xtask::main() }`)
-- Create: `bundler.toml` (name `Foley Kit` → `foley-kit`, `Foley Ambience` → `foley-ambience`)
+- Create: `bundler.toml` (name `Soundslop Kit` → `foley-kit`, `Soundslop Ambience` → `foley-ambience`)
 - Create: `LICENSE.txt` (GPL-3.0-or-later), `.gitignore` (`/target`, `/target/bundled`)
 - Create: `crates/foley-engine/Cargo.toml`, `crates/foley-engine/src/lib.rs`
 - Test: `crates/foley-engine/tests/pins.rs`
@@ -656,12 +656,12 @@ git commit -m "feat(engine): KitRig — voice pool, FIFO clip pickup, steal-olde
 **Interfaces:**
 - Consumes: `AmbienceRig`/`LayerState` (Task 8), `BedKind` (Task 5).
 - Produces:
-  - `pub struct Ambience;` implementing `nih_plug::plugin::Plugin`: `NAME = "Foley Ambience"`; `AUDIO_IO_LAYOUTS = [AudioIOLayout { main_input_channels: None, main_output_channels: NonZeroU32::new(2), .. } ]`; `MIDI_INPUT = MidiConfig::Basic`, `MIDI_OUTPUT = None`; `HARD_REALTIME_ONLY = false`; `SAMPLE_ACCURATE_AUTOMATION = false`; `process` always returns `ProcessStatus::KeepAlive`.
+  - `pub struct Ambience;` implementing `nih_plug::plugin::Plugin`: `NAME = "Soundslop Ambience"`; `AUDIO_IO_LAYOUTS = [AudioIOLayout { main_input_channels: None, main_output_channels: NonZeroU32::new(2), .. } ]`; `MIDI_INPUT = MidiConfig::Basic`, `MIDI_OUTPUT = None`; `HARD_REALTIME_ONLY = false`; `SAMPLE_ACCURATE_AUTOMATION = false`; `process` always returns `ProcessStatus::KeepAlive`.
   - `params.rs`: `pub struct AmbienceParams` with `#[derive(Params)]` — `#[id = "output_gain"] output_gain: FloatParam` (−24..=+6 dB, default 0.0), `#[id = "scene_glide"] scene_glide: FloatParam` (0.02..=1.0, default 0.30), and six layer structs generated by a `macro_rules!` (`Layer1Params`…`Layer6Params`, `#[nested(group = "Layer N")]`) so every id is the **exact literal** `l{n}_kind`, `l{n}_gain`, `l{n}_seed`, `l{n}_motion_amt`, `l{n}_motion_rate`, `l{n}_dist`, `l{n}_az`, `l{n}_knob_a`…`l{n}_knob_d`. Per spec §10: `kind` = `EnumParam<LayerKind>` (11 variants in the pinned order), `gain` 0..=1.5 default 0.5, `seed` IntParam 0..=16_777_215 default per index, `motion_amt` 0..=1 default 0.15, `motion_rate` 0..=1, `dist` 0..=64 default 0.0, `az` −180..=180 default 0, knobs 0..=1 default 0.5.
   - `LayerKind` (plugin-local enum with `Off` first) ↔ `Option<BedKind>` conversion.
   - `process`: drain and ignore events (`while context.next_event().is_some() {}`); track per-layer previous raw `knob_b` value; rising edge on a Thunder layer → `rig.strike(layer, base)` with the frozen derivation `base = hit_seed(layer seed, az scaled to u8, dist/64.0, per-layer strike counter)`; write `rig.layers()[i]` from params (no smoothing here — the rig smooths); `rig.set_glide(scene_glide)`, `rig.set_output_gain(db_to_linear(output_gain))`; chunk the output buffer at `MAX_BLOCK` into `rig.process`.
   - `initialize`: `foley_synth::warm_voice_tables()` then one `howl(seed, sample_rate)` render off-thread (spec §9 pre-warm; the howl call is allowed to run inside `initialize` since it is not the audio thread).
-  - Exports: `nih_export_clap!(Ambience); nih_export_vst3!(Ambience);` + `impl ClapPlugin { const CLAP_ID: &str = "io.github.cumsauce.foley.ambience"; const CLAP_FEATURES: &[ClapFeature] = &[ClapFeature::Instrument, ClapFeature::Synthesizer]; }` + `impl Vst3Plugin { const VST3_CLASS_ID: [u8; 16] = *b"F0leyAmbience.01"; const VST3_SUBCATEGORIES: &[Vst3SubCategory] = &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth]; }` (editor comes in Task 12; `editor()` may return `None` for now).
+  - Exports: `nih_export_clap!(Ambience); nih_export_vst3!(Ambience);` + `impl ClapPlugin { const CLAP_ID: &str = "io.github.cumsauce.soundslop.ambience"; const CLAP_FEATURES: &[ClapFeature] = &[ClapFeature::Instrument, ClapFeature::Synthesizer]; }` + `impl Vst3Plugin { const VST3_CLASS_ID: [u8; 16] = *b"S0undslopAmb.001"; const VST3_SUBCATEGORIES: &[Vst3SubCategory] = &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth]; }` (editor comes in Task 12; `editor()` may return `None` for now).
 
 - [ ] **Step 1: Write the failing tests** (in `params.rs`)
 
@@ -685,13 +685,13 @@ Params per the verbatim id list; process per Interfaces. The `macro_rules!` gene
 - [ ] **Step 4: Run tests to verify they pass + bundle builds**
 
 Run: `cargo test -p foley-ambience && cargo xtask bundle foley-ambience`
-Expected: tests PASS; bundle step succeeds and writes `target/bundled/Foley Ambience.clap` and `.vst3`.
+Expected: tests PASS; bundle step succeeds and writes `target/bundled/Soundslop Ambience.clap` and `.vst3`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add crates/foley-ambience
-git commit -m "feat(ambience): Foley Ambience plugin — 68 params, KeepAlive process"
+git commit -m "feat(ambience): Soundslop Ambience plugin — 68 params, KeepAlive process"
 ```
 
 ### Task 11: foley-kit plugin crate
@@ -706,11 +706,11 @@ git commit -m "feat(ambience): Foley Ambience plugin — 68 params, KeepAlive pr
 **Interfaces:**
 - Consumes: `KitRig`/`SlotState` (Task 9), `SlotCategory`/`kind_range` (Task 7).
 - Produces:
-  - `pub struct Kit;` implementing `Plugin`: `NAME = "Foley Kit"`; `AUDIO_IO_LAYOUTS` stereo-out/no-in; `MIDI_INPUT = MidiConfig::Basic`; `HARD_REALTIME_ONLY = false`; `SAMPLE_ACCURATE_AUTOMATION = false`; `ProcessStatus::KeepAlive`.
+  - `pub struct Kit;` implementing `Plugin`: `NAME = "Soundslop Kit"`; `AUDIO_IO_LAYOUTS` stereo-out/no-in; `MIDI_INPUT = MidiConfig::Basic`; `HARD_REALTIME_ONLY = false`; `SAMPLE_ACCURATE_AUTOMATION = false`; `ProcessStatus::KeepAlive`.
   - `params.rs`: `KitParams` — master `#[id = "output_gain"]` (−24..=+6 dB, 0.0), `#[id = "polyphony"]` `EnumParam<Polyphony>` with `#[derive(Enum, Clone, Copy, PartialEq)] enum Polyphony { V4, V8, V16 }` (default V8), `#[id = "humanize"]` FloatParam 0..=1 default 0.0; eight slot structs via `macro_rules!` (`Slot1Params`…`Slot8Params`) with literal ids `s{n}_category` (`EnumParam<SlotKind>` over the 6 `SlotCategory` variants), `s{n}_kind` IntParam 0..=62 default 0, `s{n}_voice_mob` IntParam 0..=51 default 0, `s{n}_note` IntParam 0..=127 default 60, `s{n}_knob_a`/`s{n}_knob_b` 0..=1 default 0.5, `s{n}_gain` 0..=1.5 default 0.8, `s{n}_pan` −100..=100 default 0, `s{n}_seed` IntParam 0..=16_777_215 default per index, `s{n}_fresh` BoolParam default true.
   - `process`: `while let Some(event) = context.next_event()` — `NoteOn { note, velocity, .. }` → `rig.note_on(note, velocity)`; `NoteOff` ignored (spec §11); copy slots into the rig; `set_polyphony`/`set_humanize`/`set_output_gain`; chunk at `MAX_BLOCK` → `rig.process`.
   - `initialize`: `warm_voice_tables()` + one worker warm-up render (spec §9).
-  - Exports: `nih_export_clap!(Kit); nih_export_vst3!(Kit);` + `CLAP_ID = "io.github.cumsauce.foley.kit"`, `CLAP_FEATURES = &[Instrument, Synthesizer]`, `VST3_CLASS_ID = *b"F0leyKit.0100001"`, `VST3_SUBCATEGORIES = &[Instrument, Synth]`.
+  - Exports: `nih_export_clap!(Kit); nih_export_vst3!(Kit);` + `CLAP_ID = "io.github.cumsauce.soundslop.kit"`, `CLAP_FEATURES = &[Instrument, Synthesizer]`, `VST3_CLASS_ID = *b"S0undslopKit.001"`, `VST3_SUBCATEGORIES = &[Instrument, Synth]`.
 
 - [ ] **Step 1: Write the failing tests** (in `params.rs`)
 
@@ -738,7 +738,7 @@ Expected: PASS + bundles under `target/bundled/`.
 
 ```bash
 git add crates/foley-kit
-git commit -m "feat(kit): Foley Kit plugin — 83 params, MIDI one-shot trigger"
+git commit -m "feat(kit): Soundslop Kit plugin — 83 params, MIDI one-shot trigger"
 ```
 
 ### Task 12: egui editors + preset save/load (both plugins)
@@ -828,7 +828,7 @@ Expected: PASS (zero audio-thread allocations).
 
 - [ ] **Step 5: Add CI + README**
 
-`.github/workflows/ci.yml`: (a) `ubuntu-latest` — `cargo clippy --workspace -- -D warnings` + `cargo test --workspace`; (b) `macos-latest` — `cargo xtask bundle-universal foley-kit foley-ambience --release`, upload `target/bundled/` artifacts. Note in the workflow comments: if the foley repo is private, cargo needs a read-scoped PAT (e.g. `NETRC`/`insteadOf` setup) — left as an author decision. `README.md`: build (`cargo xtask bundle …`), install paths (`~/Library/CLAP`, `~/Library/Audio/Plug-Ins/VST3`), the unsigned-binary Gatekeeper note, Windows deferred (spec §14).
+`.github/workflows/ci.yml`: (a) `ubuntu-latest` — `cargo clippy --workspace -- -D warnings` + `cargo test --workspace`; (b) `macos-latest` — `cargo xtask bundle-universal foley-kit foley-ambience --release`, upload `target/bundled/` artifacts. The foley repo is public, so cargo's git deps clone without credentials — no PAT/netrc setup in CI. `README.md`: build (`cargo xtask bundle …`), install paths (`~/Library/CLAP`, `~/Library/Audio/Plug-Ins/VST3`), primary host note ("tested against Bitwig — CLAP is the primary format; VST3 secondary"), the unsigned-binary Gatekeeper note, Windows deferred (spec §14).
 
 - [ ] **Step 6: Full gate + commit**
 
