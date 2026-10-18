@@ -12,6 +12,7 @@
 use nih_plug::prelude::{
     BoolParam, Enum, EnumParam, FloatParam, FloatRange, IntParam, IntRange, Params,
 };
+use nih_plug_egui::EguiState;
 
 use foley_engine::SlotCategory;
 
@@ -119,6 +120,9 @@ impl SlotParams {
 /// The full 83-param set for Soundslop Kit.
 #[derive(Params)]
 pub struct KitParams {
+    /// Editor window size, saved with the plugin state.
+    #[persist = "editor-state"]
+    pub editor_state: std::sync::Arc<EguiState>,
     #[id = "output_gain"]
     pub output_gain: FloatParam,
     #[id = "polyphony"]
@@ -152,6 +156,7 @@ impl Default for KitParams {
     fn default() -> Self {
         let [s1, s2, s3, s4, s5, s6, s7, s8] = Self::SEED_DEFAULTS;
         KitParams {
+            editor_state: EguiState::from_size(400, 560),
             output_gain: FloatParam::new(
                 "Output Gain",
                 0.0,

@@ -6,12 +6,17 @@
 //! layer's knob B (the momentary "strike" knob), never by MIDI — this plugin
 //! is a generative instrument, not a sampler.
 
+// The `nih_export_vst3!` macro (pinned nih-plug rev) expands to a trailing
+// semicolon that trips a future-compat lint we can't fix upstream.
+#![allow(semicolon_in_expressions_from_non_local_macros)]
+
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use nih_plug::prelude::*;
 use params::AmbienceParams;
 
+pub mod editor;
 pub mod params;
 
 use foley_engine::{AmbienceRig, LAYERS, hit_seed};
@@ -71,6 +76,12 @@ impl Plugin for Ambience {
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
+    }
+
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+        let params = self.params.clone();
+        let egui_state = self.params.editor_state.clone();
+        editor::make_editor(params, egui_state)
     }
 
     fn initialize(

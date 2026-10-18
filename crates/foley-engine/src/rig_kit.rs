@@ -362,12 +362,11 @@ impl KitRig {
             })
             .min_by_key(|&(seq, _)| seq)
             .map(|(_, v)| v);
-        if let Some(v) = victim {
-            if let VoiceState::Playing { clip, .. } =
+        if let Some(v) = victim
+            && let VoiceState::Playing { clip, .. } =
                 std::mem::replace(&mut v.state, VoiceState::Free)
-            {
-                self.return_buffer(clip);
-            }
+        {
+            self.return_buffer(clip);
         }
     }
 

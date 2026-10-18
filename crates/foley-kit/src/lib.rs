@@ -5,12 +5,17 @@
 //! on the clip worker. NoteOff is ignored (foley one-shots run to completion,
 //! spec §11).
 
+// The `nih_export_vst3!` macro (pinned nih-plug rev) expands to a trailing
+// semicolon that trips a future-compat lint we can't fix upstream.
+#![allow(semicolon_in_expressions_from_non_local_macros)]
+
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use nih_plug::prelude::*;
 use params::KitParams;
 
+pub mod editor;
 pub mod params;
 
 use foley_engine::{KitRig, SlotState};
@@ -54,6 +59,12 @@ impl Plugin for Kit {
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
+    }
+
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+        let params = self.params.clone();
+        let egui_state = self.params.editor_state.clone();
+        editor::make_editor(params, egui_state)
     }
 
     fn initialize(

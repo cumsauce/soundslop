@@ -36,32 +36,40 @@ impl BedKind {
 }
 
 /// A constructed bed of one kind.
+///
+/// The large variants are boxed so the enum stays pointer-sized; beds are
+/// built on the rebuilder thread (not the audio thread) and only ever
+/// accessed through `&mut`, so the indirection costs nothing realtime.
 pub enum BedUnion {
-    Rain(foley_dsp::Rain),
-    Wind(foley_dsp::Wind),
-    Water(foley_dsp::Water),
-    Fire(foley_dsp::Fire),
-    Lava(foley_dsp::Lava),
-    Thunder(foley_synth::Thunder),
-    Cave(foley_dsp::Cave),
-    Underwater(foley_dsp::Underwater),
-    Biome(foley_synth::Biome),
-    Surf(foley_synth::Surf),
+    Rain(Box<foley_dsp::Rain>),
+    Wind(Box<foley_dsp::Wind>),
+    Water(Box<foley_dsp::Water>),
+    Fire(Box<foley_dsp::Fire>),
+    Lava(Box<foley_dsp::Lava>),
+    Thunder(Box<foley_synth::Thunder>),
+    Cave(Box<foley_dsp::Cave>),
+    Underwater(Box<foley_dsp::Underwater>),
+    Biome(Box<foley_synth::Biome>),
+    Surf(Box<foley_synth::Surf>),
 }
 
 /// Constructs the bed for `kind` at the given seed and sample rate.
 pub fn new_bed(kind: BedKind, seed: u64, sample_rate: u32) -> BedUnion {
     match kind {
-        BedKind::Rain => BedUnion::Rain(foley_dsp::Rain::new(seed, sample_rate)),
-        BedKind::Wind => BedUnion::Wind(foley_dsp::Wind::new(seed, sample_rate)),
-        BedKind::Water => BedUnion::Water(foley_dsp::Water::new(seed, sample_rate)),
-        BedKind::Fire => BedUnion::Fire(foley_dsp::Fire::new(seed, sample_rate)),
-        BedKind::Lava => BedUnion::Lava(foley_dsp::Lava::new(seed, sample_rate)),
-        BedKind::Thunder => BedUnion::Thunder(foley_synth::Thunder::new(seed, sample_rate)),
-        BedKind::Cave => BedUnion::Cave(foley_dsp::Cave::new(seed, sample_rate)),
-        BedKind::Underwater => BedUnion::Underwater(foley_dsp::Underwater::new(seed, sample_rate)),
-        BedKind::Biome => BedUnion::Biome(foley_synth::Biome::new(seed, sample_rate)),
-        BedKind::Surf => BedUnion::Surf(foley_synth::Surf::new(seed, sample_rate)),
+        BedKind::Rain => BedUnion::Rain(Box::new(foley_dsp::Rain::new(seed, sample_rate))),
+        BedKind::Wind => BedUnion::Wind(Box::new(foley_dsp::Wind::new(seed, sample_rate))),
+        BedKind::Water => BedUnion::Water(Box::new(foley_dsp::Water::new(seed, sample_rate))),
+        BedKind::Fire => BedUnion::Fire(Box::new(foley_dsp::Fire::new(seed, sample_rate))),
+        BedKind::Lava => BedUnion::Lava(Box::new(foley_dsp::Lava::new(seed, sample_rate))),
+        BedKind::Thunder => {
+            BedUnion::Thunder(Box::new(foley_synth::Thunder::new(seed, sample_rate)))
+        }
+        BedKind::Cave => BedUnion::Cave(Box::new(foley_dsp::Cave::new(seed, sample_rate))),
+        BedKind::Underwater => {
+            BedUnion::Underwater(Box::new(foley_dsp::Underwater::new(seed, sample_rate)))
+        }
+        BedKind::Biome => BedUnion::Biome(Box::new(foley_synth::Biome::new(seed, sample_rate))),
+        BedKind::Surf => BedUnion::Surf(Box::new(foley_synth::Surf::new(seed, sample_rate))),
     }
 }
 

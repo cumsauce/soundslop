@@ -11,6 +11,7 @@
 //! would synthesise `{key}_{index}`) — the brief forbids that form.
 
 use nih_plug::prelude::{Enum, EnumParam, FloatParam, FloatRange, IntParam, IntRange, Params};
+use nih_plug_egui::EguiState;
 
 /// The eleven layer kinds: `Off` first, then the ten beds in [`BedKind`] order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Enum)]
@@ -147,6 +148,9 @@ impl LayerParams {
 /// The full 68-param set for Soundslop Ambience.
 #[derive(Params)]
 pub struct AmbienceParams {
+    /// Editor window size, saved with the plugin state.
+    #[persist = "editor-state"]
+    pub editor_state: std::sync::Arc<EguiState>,
     #[id = "output_gain"]
     pub output_gain: FloatParam,
     #[id = "scene_glide"]
@@ -174,6 +178,7 @@ impl Default for AmbienceParams {
     fn default() -> Self {
         let [s1, s2, s3, s4, s5, s6] = Self::SEED_DEFAULTS;
         AmbienceParams {
+            editor_state: EguiState::from_size(400, 560),
             output_gain: FloatParam::new(
                 "Output Gain",
                 0.0,

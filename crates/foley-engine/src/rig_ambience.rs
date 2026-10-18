@@ -195,9 +195,9 @@ impl AmbienceRig {
         self.service_rebuilds();
         // 2. Smooth knobs once per call, add motion, arm the beds.
         let knob_eff = self.advance_knobs(dt);
-        for i in 0..LAYERS {
-            if let Some(bed) = self.rt[i].bed.as_mut() {
-                bed.set_scene_knobs(knob_eff[i]);
+        for (rt, knobs) in self.rt.iter_mut().zip(knob_eff.iter()) {
+            if let Some(bed) = rt.bed.as_mut() {
+                bed.set_scene_knobs(*knobs);
             }
         }
         // 3. Render in MAX_BLOCK chunks, guard, write out.
@@ -288,17 +288,17 @@ impl AmbienceRig {
     fn advance_knobs(&mut self, dt: f32) -> [[f32; 4]; LAYERS] {
         let mut out = [[0.0f32; 4]; LAYERS];
         let alpha = self.alpha;
-        for i in 0..LAYERS {
+        for (i, rt) in self.rt.iter_mut().enumerate() {
             let st = self.states[i];
             // Recreate the walk only when its config actually changed.
             let cfg = (st.motion_amt, st.motion_rate, st.seed);
-            if cfg != self.rt[i].motion_cfg {
-                self.rt[i].motion = Motion::new(cfg.0, cfg.1, cfg.2);
-                self.rt[i].motion_cfg = cfg;
+            if cfg != rt.motion_cfg {
+                rt.motion = Motion::new(cfg.0, cfg.1, cfg.2);
+                rt.motion_cfg = cfg;
             }
-            let offs = self.rt[i].motion.next(dt);
+            let offs = rt.motion.next(dt);
             for k in 0..4 {
-                let sm = &mut self.rt[i].smoothed[k];
+                let sm = &mut rt.smoothed[k];
                 *sm += (st.knobs[k] - *sm) * alpha;
                 out[i][k] = (*sm + offs[k]).clamp(0.0, 1.0);
             }
