@@ -1,0 +1,13 @@
+[package]
+name = "foley-engine"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+foley-dsp = { workspace = true }
+foley-synth = { workspace = true }

@@ -1,0 +1,25 @@
+[workspace]
+members = ["xtask", "crates/*"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.dependencies]
+foley-math = { git = "https://github.com/cumsauce/foley", rev = "4b153c6" }
+foley-dsp = { git = "https://github.com/cumsauce/foley", rev = "4b153c6" }
+foley-synth = { git = "https://github.com/cumsauce/foley", rev = "4b153c6" }
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
+nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
+nih_plug_xtask = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
+
+# dev-only: use the sibling foley checkout instead of fetching from GitHub
+[patch."https://github.com/cumsauce/foley"]
+foley-math = { path = "../foley/crates/foley-math" }
+foley-dsp = { path = "../foley/crates/foley-dsp" }
+foley-synth = { path = "../foley/crates/foley-synth" }
