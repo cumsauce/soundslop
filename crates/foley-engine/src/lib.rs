@@ -7,6 +7,7 @@ mod kind_map;
 mod kit_map;
 mod motion;
 mod rebuild;
+mod rig_ambience;
 mod seed_mix;
 mod spatial;
 
@@ -17,6 +18,7 @@ pub use kind_map::knob_labels;
 pub use kit_map::{kind_range, kit_knob_labels, render_clip};
 pub use motion::Motion;
 pub use rebuild::{RebuildJob, spawn_rebuilder};
+pub use rig_ambience::{AmbienceRig, LAYERS, LayerState};
 pub use seed_mix::hit_seed;
 pub use spatial::{OnePoleLpf, layer_cutoff, pan_gains};
 
