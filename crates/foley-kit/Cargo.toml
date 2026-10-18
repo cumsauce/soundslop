@@ -1,0 +1,17 @@
+[package]
+name = "foley-kit"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+nih_plug = { workspace = true }
+foley-engine = { path = "../foley-engine" }
+foley-synth = { workspace = true }

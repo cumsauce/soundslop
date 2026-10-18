@@ -231,6 +231,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "foley-kit"
+version = "0.1.0"
+dependencies = [
+ "foley-engine",
+ "foley-synth",
+ "nih_plug",
+]
+
+[[package]]
 name = "foley-math"
 version = "0.1.0-beta.62"
 
