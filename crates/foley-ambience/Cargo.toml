@@ -17,6 +17,6 @@ nice-plug-egui = { workspace = true }
 egui = { workspace = true }
 serde = { workspace = true }
 foley-engine = { path = "../foley-engine" }
+foley-ui = { path = "../foley-ui" }
 foley-synth = { workspace = true }
 rfd = "0.15"
-serde_json = "1"
