@@ -14,9 +14,11 @@ unsafe_code = "deny"
 foley-math = { git = "https://github.com/cumsauce/foley", rev = "78b6dcf" }
 foley-dsp = { git = "https://github.com/cumsauce/foley", rev = "78b6dcf" }
 foley-synth = { git = "https://github.com/cumsauce/foley", rev = "78b6dcf" }
-nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
-nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
-nih_plug_xtask = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
+nice-plug = "0.4"
+nice-plug-egui = "0.6"
+nice-plug-xtask = "0.1"
+egui = "0.37"
+serde = { version = "1", features = ["derive"] }
 
 # dev-only: use the sibling foley checkout instead of fetching from GitHub
 [patch."https://github.com/cumsauce/foley"]

@@ -5,13 +5,31 @@
 //!
 //! Every layer param id is the exact literal `l{N}_{name}` (e.g. `l1_kind`,
 //! `l3_knob_a`). This is produced by nesting a shared [`LayerParams`] struct
-//! under `#[nested(id_prefix = "l1", ...)]`: NIH-plug's derive builds each id
+//! under `#[nested(id_prefix = "l1", ...)]`: nice-plug's derive builds each id
 //! as `format!("{prefix}_{key}")`, so the inner bare id `"kind"` under prefix
 //! `"l1"` becomes exactly `l1_kind`. This is *not* `nested(array)` (which
 //! would synthesise `{key}_{index}`) — the brief forbids that form.
 
-use nih_plug::prelude::{Enum, EnumParam, FloatParam, FloatRange, IntParam, IntRange, Params};
-use nih_plug_egui::EguiState;
+use nice_plug::prelude::{Enum, EnumParam, FloatParam, FloatRange, IntParam, IntRange, Params};
+use serde::{Deserialize, Serialize};
+
+/// Editor window geometry, persisted with the plugin state. `EguiEditorState` itself is not
+/// serializable, so we persist the logical size and rebuild the state in `Plugin::editor()`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct EditorSize {
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Default for EditorSize {
+    fn default() -> Self {
+        // Preferred 576 × 720 per the UI contract; minimum 380 × 520.
+        Self {
+            width: 576.0,
+            height: 720.0,
+        }
+    }
+}
 
 /// The eleven layer kinds: `Off` first, then the ten beds in [`BedKind`] order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Enum)]
@@ -150,7 +168,7 @@ impl LayerParams {
 pub struct AmbienceParams {
     /// Editor window size, saved with the plugin state.
     #[persist = "editor-state"]
-    pub editor_state: std::sync::Arc<EguiState>,
+    pub editor_state: std::sync::RwLock<EditorSize>,
     #[id = "output_gain"]
     pub output_gain: FloatParam,
     #[id = "scene_glide"]
@@ -178,7 +196,7 @@ impl Default for AmbienceParams {
     fn default() -> Self {
         let [s1, s2, s3, s4, s5, s6] = Self::SEED_DEFAULTS;
         AmbienceParams {
-            editor_state: EguiState::from_size(400, 560),
+            editor_state: std::sync::RwLock::new(EditorSize::default()),
             output_gain: FloatParam::new(
                 "Output Gain",
                 0.0,

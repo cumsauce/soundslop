@@ -1,3 +1,3 @@
 fn main() {
-    nih_plug_xtask::main().expect("xtask failed");
+    nice_plug_xtask::main().expect("xtask failed");
 }

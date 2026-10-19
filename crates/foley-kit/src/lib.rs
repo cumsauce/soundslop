@@ -1,18 +1,14 @@
 //! Soundslop Kit: a MIDI-triggered procedural foley one-shot instrument.
 //!
-//! One CLAP + VST3 plugin (via NIH-plug) wrapping [`KitRig`]. MIDI NoteOn
+//! One CLAP + VST3 plugin (via nice-plug) wrapping [`KitRig`]. MIDI NoteOn
 //! triggers any slot whose `note` matches; each hit renders a fresh one-shot
 //! on the clip worker. NoteOff is ignored (foley one-shots run to completion,
 //! spec §11).
 
-// The `nih_export_vst3!` macro (pinned nih-plug rev) expands to a trailing
-// semicolon that trips a future-compat lint we can't fix upstream.
-#![allow(semicolon_in_expressions_from_non_local_macros)]
-
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use nih_plug::prelude::*;
+use nice_plug::prelude::*;
 use params::KitParams;
 
 pub mod editor;
@@ -56,22 +52,21 @@ impl Plugin for Kit {
 
     type SysExMessage = ();
     type BackgroundTask = ();
+    type Editor = nice_plug_egui::EguiEditor<editor::KitEditor>;
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
     }
 
-    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        let params = self.params.clone();
-        let egui_state = self.params.editor_state.clone();
-        editor::make_editor(params, egui_state)
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Self::Editor> {
+        editor::make_editor(self.params.clone())
     }
 
-    fn initialize(
+    fn activate(
         &mut self,
         _audio_io_layout: &AudioIOLayout,
         buffer_config: &BufferConfig,
-        _context: &mut impl InitContext<Self>,
+        _context: &mut impl ActivateContext<Self>,
     ) -> bool {
         self.sample_rate = buffer_config.sample_rate;
         let rate = buffer_config.sample_rate as u32;
@@ -132,7 +127,9 @@ impl Plugin for Kit {
 
         // 3. Drain MIDI: NoteOn triggers matching slots; NoteOff ignored.
         while let Some(event) = context.next_event() {
-            if let NoteEvent::NoteOn { note, velocity, .. } = event {
+            if let NoteEvent::NoteOn { key, velocity, .. } = event
+                && let Some(note) = key.number()
+            {
                 rig.note_on(note, velocity);
             }
         }
@@ -171,5 +168,5 @@ impl Vst3Plugin for Kit {
         &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth];
 }
 
-nih_export_clap!(Kit);
-nih_export_vst3!(Kit);
+nice_export_clap!(Kit);
+nice_export_vst3!(Kit);

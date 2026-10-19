@@ -9,10 +9,28 @@
 //! `#[nested(id_prefix = "s1", ...)]` — the framework builds `format!("{prefix}_{key}")`.
 //! This is *not* `nested(array)` (which yields `{key}_{index}`).
 
-use nih_plug::prelude::{
+use nice_plug::prelude::{
     BoolParam, Enum, EnumParam, FloatParam, FloatRange, IntParam, IntRange, Params,
 };
-use nih_plug_egui::EguiState;
+use serde::{Deserialize, Serialize};
+
+/// Editor window geometry, persisted with the plugin state. `EguiEditorState` itself is not
+/// serializable, so we persist the logical size and rebuild the state in `Plugin::editor()`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct EditorSize {
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Default for EditorSize {
+    fn default() -> Self {
+        // Preferred 576 × 720 per the UI contract; minimum 380 × 520.
+        Self {
+            width: 576.0,
+            height: 720.0,
+        }
+    }
+}
 
 use foley_engine::SlotCategory;
 
@@ -122,7 +140,7 @@ impl SlotParams {
 pub struct KitParams {
     /// Editor window size, saved with the plugin state.
     #[persist = "editor-state"]
-    pub editor_state: std::sync::Arc<EguiState>,
+    pub editor_state: std::sync::RwLock<EditorSize>,
     #[id = "output_gain"]
     pub output_gain: FloatParam,
     #[id = "polyphony"]
@@ -156,7 +174,7 @@ impl Default for KitParams {
     fn default() -> Self {
         let [s1, s2, s3, s4, s5, s6, s7, s8] = Self::SEED_DEFAULTS;
         KitParams {
-            editor_state: EguiState::from_size(400, 560),
+            editor_state: std::sync::RwLock::new(EditorSize::default()),
             output_gain: FloatParam::new(
                 "Output Gain",
                 0.0,

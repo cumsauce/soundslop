@@ -9,4 +9,4 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-nih_plug_xtask = { workspace = true }
+nice-plug-xtask = { workspace = true }

@@ -1,19 +1,15 @@
 //! Soundslop Ambience: a six-layer procedural soundscape generator.
 //!
-//! One CLAP + VST3 plugin (via NIH-plug) wrapping [`AmbienceRig`]. All 68
+//! One CLAP + VST3 plugin (via nice-plug) wrapping [`AmbienceRig`]. All 68
 //! parameters are written to the rig once per block; the rig smooths, glides
 //! and renders. Thunder strikes are triggered by a rising edge on a Thunder
 //! layer's knob B (the momentary "strike" knob), never by MIDI — this plugin
 //! is a generative instrument, not a sampler.
 
-// The `nih_export_vst3!` macro (pinned nih-plug rev) expands to a trailing
-// semicolon that trips a future-compat lint we can't fix upstream.
-#![allow(semicolon_in_expressions_from_non_local_macros)]
-
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-use nih_plug::prelude::*;
+use nice_plug::prelude::*;
 use params::AmbienceParams;
 
 pub mod editor;
@@ -76,22 +72,21 @@ impl Plugin for Ambience {
 
     type SysExMessage = ();
     type BackgroundTask = ();
+    type Editor = nice_plug_egui::EguiEditor<editor::AmbienceEditor>;
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
     }
 
-    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
-        let params = self.params.clone();
-        let egui_state = self.params.editor_state.clone();
-        editor::make_editor(params, egui_state)
+    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Self::Editor> {
+        editor::make_editor(self.params.clone())
     }
 
-    fn initialize(
+    fn activate(
         &mut self,
         _audio_io_layout: &AudioIOLayout,
         buffer_config: &BufferConfig,
-        _context: &mut impl InitContext<Self>,
+        _context: &mut impl ActivateContext<Self>,
     ) -> bool {
         self.sample_rate = buffer_config.sample_rate;
         let rate = buffer_config.sample_rate as u32;
@@ -239,8 +234,8 @@ impl Vst3Plugin for Ambience {
         &[Vst3SubCategory::Instrument, Vst3SubCategory::Synth];
 }
 
-nih_export_clap!(Ambience);
-nih_export_vst3!(Ambience);
+nice_export_clap!(Ambience);
+nice_export_vst3!(Ambience);
 
 #[cfg(test)]
 mod tests {
