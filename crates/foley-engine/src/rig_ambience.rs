@@ -13,7 +13,7 @@ use crate::guard::GainGuard;
 use crate::motion::Motion;
 use crate::rebuild::{RebuildJob, spawn_rebuilder};
 use crate::spatial::{OnePoleLpf, layer_cutoff, pan_gains};
-use crate::{LAYER_CEILING, MASTER_CEILING, MAX_BLOCK};
+use crate::{LAYER_CEILING, MASTER_CEILING, MAX_BLOCK, MAX_SAMPLE_RATE, MIN_SAMPLE_RATE};
 
 /// Layers per scene.
 pub const LAYERS: usize = 6;
@@ -113,14 +113,15 @@ impl AmbienceRig {
     /// A rig for the host's sample rate (32..=192 kHz). All layers start
     /// Off; the rebuilder thread starts with it.
     pub fn new(sample_rate: u32) -> AmbienceRig {
+        let rate = sample_rate.clamp(MIN_SAMPLE_RATE, MAX_SAMPLE_RATE);
         let (jobs_tx, jobs_rx) = sync_channel::<RebuildJob>(32);
         let (bed_tx, bed_rx) = sync_channel::<BedUnion>(1);
         let rebuilder = spawn_rebuilder(jobs_rx, bed_tx);
         AmbienceRig {
             states: [LayerState::default(); LAYERS],
             rt: std::array::from_fn(|_| LayerRt::default()),
-            rate: sample_rate,
-            alpha: knob_alpha(0.30, sample_rate),
+            rate,
+            alpha: knob_alpha(0.30, rate),
             output_gain: 1.0,
             master: GainGuard::new(MASTER_CEILING),
             scratch: [0.0; MAX_BLOCK],

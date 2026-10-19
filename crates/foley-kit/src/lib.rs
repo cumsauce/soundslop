@@ -40,7 +40,7 @@ impl Plugin for Kit {
     const NAME: &'static str = "Soundslop Kit";
     const VENDOR: &'static str = "cumsauce";
     const URL: &'static str = "https://github.com/cumsauce/soundslop";
-    const EMAIL: &'static str = "";
+    const EMAIL: &'static str = "cumsauce@users.noreply.github.com";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
     const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {

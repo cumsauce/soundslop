@@ -25,16 +25,20 @@ jobs:
       - name: Drop dev-only sibling [patch] section
         run: |
           python3 - <<'EOF'
-          import re, pathlib
+          import pathlib
           p = pathlib.Path("Cargo.toml")
-          text = p.read_text()
-          # Remove the [patch."https://github.com/cumsauce/foley"] section.
-          text = re.sub(
-              r'\n\[patch\."https://github\.com/cumsauce/foley"\][^\[]*',
-              "\n",
-              text,
-          )
-          p.write_text(text)
+          lines = p.read_text().splitlines(keepends=True)
+          out = []
+          skip = False
+          for line in lines:
+              if line.startswith('[patch."https://github.com/cumsauce/foley"'):
+                  skip = True
+                  continue
+              if skip and line.startswith('['):
+                  skip = False
+              if not skip:
+                  out.append(line)
+          p.write_text("".join(out))
           EOF
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
@@ -51,15 +55,20 @@ jobs:
       - name: Drop dev-only sibling [patch] section
         run: |
           python3 - <<'EOF'
-          import re, pathlib
+          import pathlib
           p = pathlib.Path("Cargo.toml")
-          text = p.read_text()
-          text = re.sub(
-              r'\n\[patch\."https://github\.com/cumsauce/foley"\][^\[]*',
-              "\n",
-              text,
-          )
-          p.write_text(text)
+          lines = p.read_text().splitlines(keepends=True)
+          out = []
+          skip = False
+          for line in lines:
+              if line.startswith('[patch."https://github.com/cumsauce/foley"'):
+                  skip = True
+                  continue
+              if skip and line.startswith('['):
+                  skip = False
+              if not skip:
+                  out.append(line)
+          p.write_text("".join(out))
           EOF
       - name: Build universal bundles
         run: |

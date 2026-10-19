@@ -1,5 +1,10 @@
 //! Shared engine constants and re-exports for the Soundslop plugins.
 
+/// Supported host sample-rate range (spec §14).
+pub const MIN_SAMPLE_RATE: u32 = 32_000;
+/// Supported host sample-rate range (spec §14).
+pub const MAX_SAMPLE_RATE: u32 = 192_000;
+
 mod bed_union;
 mod clip;
 mod guard;

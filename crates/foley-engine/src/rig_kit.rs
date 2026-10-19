@@ -14,7 +14,7 @@ use crate::guard::GainGuard;
 use crate::kit_map::kind_range;
 use crate::seed_mix::hit_seed;
 use crate::spatial::pan_gains;
-use crate::{MASTER_CEILING, MAX_VOICES};
+use crate::{MASTER_CEILING, MAX_SAMPLE_RATE, MAX_VOICES, MIN_SAMPLE_RATE};
 
 /// Slots per Kit instance.
 pub const SLOTS: usize = 8;
@@ -117,6 +117,7 @@ impl KitRig {
     /// their spec defaults; the clip worker thread starts with it and the
     /// shared voice LUTs are grown off the first-note path.
     pub fn new(sample_rate: u32) -> KitRig {
+        let rate = sample_rate.clamp(MIN_SAMPLE_RATE, MAX_SAMPLE_RATE);
         foley_synth::warm_voice_tables();
         let (jobs_tx, jobs_rx) = sync_channel::<EngineJob>(32);
         let (clips_tx, clips_rx) = sync_channel::<Vec<f32>>(MAX_VOICES * 2);
@@ -130,13 +131,13 @@ impl KitRig {
             humanize: 0.0,
             output_gain: 1.0,
             master: GainGuard::new(MASTER_CEILING),
-            rate: sample_rate,
+            rate,
             jobs_tx: Some(jobs_tx),
             clips_rx: Some(clips_rx),
             worker: Some(worker),
             starved: 0,
-            attack_len: fade_len(ATTACK_SECONDS, sample_rate),
-            release_len: fade_len(RELEASE_SECONDS, sample_rate),
+            attack_len: fade_len(ATTACK_SECONDS, rate),
+            release_len: fade_len(RELEASE_SECONDS, rate),
         }
     }
 

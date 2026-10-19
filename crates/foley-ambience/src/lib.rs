@@ -29,6 +29,8 @@ pub struct Ambience {
     prev_knob_b: [f32; LAYERS],
     /// Per-layer strike counter for hit_seed's `counter` field.
     strike_counter: [u32; LAYERS],
+    /// Whether the one-time howl pre-warm has been spawned.
+    prewarmed: bool,
 }
 
 impl Default for Ambience {
@@ -39,6 +41,7 @@ impl Default for Ambience {
             sample_rate: 1.0,
             prev_knob_b: [0.0; LAYERS],
             strike_counter: [0; LAYERS],
+            prewarmed: false,
         }
     }
 }
@@ -57,7 +60,7 @@ impl Plugin for Ambience {
     const NAME: &'static str = "Soundslop Ambience";
     const VENDOR: &'static str = "cumsauce";
     const URL: &'static str = "https://github.com/cumsauce/soundslop";
-    const EMAIL: &'static str = "";
+    const EMAIL: &'static str = "cumsauce@users.noreply.github.com";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
     const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[AudioIOLayout {
@@ -95,10 +98,18 @@ impl Plugin for Ambience {
 
         // Pre-warm the shared LUTs (idempotent; safe off the audio thread).
         foley_synth::warm_voice_tables();
-        // One howl render to pre-grow allocator/caches (spec §9 pre-warm).
-        let _ = foley_synth::howl(0x5eed, rate);
 
         self.rig = Some(AmbienceRig::new(rate));
+
+        // Spawn the howl render on a detached thread exactly once per instance,
+        // so plugin activation doesn't block for ~1.4 s.
+        if !self.prewarmed {
+            self.prewarmed = true;
+            std::thread::spawn(move || {
+                let _ = foley_synth::howl(0x5eed, rate);
+            });
+        }
+
         true
     }
 
