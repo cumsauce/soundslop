@@ -1,0 +1,63 @@
+name: Release
+
+# Tag push (v*) builds the universal macOS CLAP bundles and publishes a
+# GitHub Release with both plugins attached.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Build & release (macOS universal)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Same as ci.yml: the committed [patch] section points at a sibling
+      # ../foley checkout that doesn't exist in CI; drop it so the pinned
+      # git rev is used instead.
+      - name: Drop dev-only sibling [patch] section
+        run: |
+          python3 - <<'EOF'
+          import pathlib
+          p = pathlib.Path("Cargo.toml")
+          lines = p.read_text().splitlines(keepends=True)
+          out = []
+          skip = False
+          for line in lines:
+              if line.startswith('[patch."https://github.com/cumsauce/foley"'):
+                  skip = True
+                  continue
+              if skip and line.startswith('['):
+                  skip = False
+              if not skip:
+                  out.append(line)
+          p.write_text("".join(out))
+          EOF
+      - name: Build universal bundles
+        run: |
+          cargo xtask bundle-universal foley-kit --release
+          cargo xtask bundle-universal foley-ambience --release
+      # ditto preserves bundle structure and code-signing metadata.
+      - name: Package CLAP bundles
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent "target/bundled/Soundslop Kit.clap" \
+            "dist/Soundslop-Kit-${GITHUB_REF_NAME}-macos-universal.zip"
+          ditto -c -k --keepParent "target/bundled/Soundslop Ambience.clap" \
+            "dist/Soundslop-Ambience-${GITHUB_REF_NAME}-macos-universal.zip"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Soundslop $GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/*.zip
