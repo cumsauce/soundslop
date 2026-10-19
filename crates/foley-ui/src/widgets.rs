@@ -13,7 +13,8 @@ use egui::{
 
 use nice_plug::prelude::*;
 
-use crate::metrics::{SEGMENTS, bipolar_fills, note_name, readback, segment_fills};
+use crate::gesture;
+use crate::metrics::{SEGMENTS, note_name, readback, segment_fills};
 use crate::theme;
 
 const CONTROL_H: f32 = 36.0;
@@ -47,6 +48,57 @@ fn small_text(ui: &mut Ui) {
 
 fn id(salt: impl std::hash::Hash + std::fmt::Debug, name: &str) -> Id {
     Id::unique(salt).with(name)
+}
+
+/// Gesture state for one control (see `crate::gesture`): whether a begin
+/// was already sent and the gesture is still open this frame.
+fn gesture_open(ui: &Ui, key: Id) -> bool {
+    ui.data(|d| d.get_temp::<bool>(key)).unwrap_or(false)
+}
+
+/// Apply one gesture step around a normalized write.
+fn apply_step<P: Param>(setter: &ParamSetter, param: &P, step: gesture::Step, n: f32) {
+    match step {
+        gesture::Step::None => {}
+        gesture::Step::Begin => setter.begin_set_parameter(param),
+        gesture::Step::BeginSet => {
+            setter.begin_set_parameter(param);
+            setter.set_parameter_normalized(param, n);
+        }
+        gesture::Step::Set => setter.set_parameter_normalized(param, n),
+        gesture::Step::End => setter.end_set_parameter(param),
+        gesture::Step::BeginSetEnd => {
+            setter.begin_set_parameter(param);
+            setter.set_parameter_normalized(param, n);
+            setter.end_set_parameter(param);
+        }
+    }
+}
+
+/// A single discrete change (button click, menu pick, keyboard step): one
+/// complete begin/set/end gesture. Public so editors can force-release a
+/// parameter (e.g. Strike on focus loss).
+pub fn set_once<P: Param>(setter: &ParamSetter, param: &P, value: P::Plain) {
+    setter.begin_set_parameter(param);
+    setter.set_parameter(param, value);
+    setter.end_set_parameter(param);
+}
+
+/// Drive a control's gesture from this frame's press/change facts and run
+/// the resulting step against `param`.
+fn drive_gesture<P: Param>(
+    ui: &mut Ui,
+    key: Id,
+    setter: &ParamSetter,
+    param: &P,
+    pressed: bool,
+    changed: bool,
+    n: f32,
+) {
+    let open = gesture_open(ui, key);
+    let (step, open_after) = gesture::next(open, pressed, changed);
+    apply_step(setter, param, step, n);
+    ui.data_mut(|d| d.insert_temp(key, open_after));
 }
 
 /// Allocate the 36-tall control box, paint its surface and its label, then
@@ -93,9 +145,17 @@ fn value_field<P: Param>(
             .custom_formatter(move |_, _| display(n))
             .custom_parser(move |s: &str| param.string_to_normalized_value(s).map(f64::from)),
     );
-    if response.changed() {
-        setter.set_parameter_normalized(param, v as f32);
-    }
+    // Typed entry, keyboard steps and drag scrubs all land here; the gesture
+    // state machine decides how the write is wrapped for the host.
+    drive_gesture(
+        ui,
+        response.id,
+        setter,
+        param,
+        response.is_pointer_button_down_on(),
+        response.changed(),
+        v as f32,
+    );
 }
 
 /// Editable value chip, right-aligned on the label row.
@@ -191,31 +251,25 @@ fn slider_body(
     chip(ui, inner, 46.0, param, setter);
     let n = param.unmodulated_normalized_value();
     let track = track_row_rect(inner);
-    draw_track(
-        ui,
-        track,
-        if bipolar {
-            bipolar_fills(n)
-        } else {
-            segment_fills(n)
-        },
-        bipolar,
-    );
+    draw_track(ui, track, segment_fills(n), bipolar);
     readback_at(ui.painter(), inner, &readback(n), theme::ACCENT_CYAN);
 
     let response = ui.interact(track, wid, Sense::drag());
-    if response.drag_started() {
-        setter.begin_set_parameter(param);
-    }
-    if let Some(pos) = response.interact_pointer_pos() {
-        let m = ((pos.x - track.left()) / track.width()).clamp(0.0, 1.0);
-        if m != n {
-            setter.set_parameter_normalized(param, m);
-        }
-    }
-    if response.drag_stopped() {
-        setter.end_set_parameter(param);
-    }
+    let target = response
+        .interact_pointer_pos()
+        .map(|pos| ((pos.x - track.left()) / track.width()).clamp(0.0, 1.0));
+    // A plain click (press frame) and a threshold-crossing drag are both
+    // gestures; the state machine wraps each write accordingly.
+    let changed = target.is_some_and(|m| (m - n).abs() > f32::EPSILON);
+    drive_gesture(
+        ui,
+        wid,
+        setter,
+        param,
+        response.is_pointer_button_down_on(),
+        changed,
+        target.unwrap_or(n),
+    );
 }
 
 /// Float slider: label + editable chip, segmented track, `n 0.000`.
@@ -226,7 +280,9 @@ pub fn slider(
     salt: impl std::hash::Hash + Copy + std::fmt::Debug,
     label: &str,
 ) {
-    let wid = id(salt, label);
+    // Ids key off the control slot, never the painted caption: dynamic knob
+    // labels change without re-identifying the widget mid-interaction.
+    let wid = id(salt, "slider");
     control_box(ui, wid, label, |ui, inner| {
         slider_body(ui, inner, param, setter, wid, false)
     });
@@ -240,7 +296,7 @@ pub fn slider_bipolar(
     salt: impl std::hash::Hash + Copy + std::fmt::Debug,
     label: &str,
 ) {
-    let wid = id(salt, label);
+    let wid = id(salt, "bipolar");
     control_box(ui, wid, label, |ui, inner| {
         slider_body(ui, inner, param, setter, wid, true)
     });
@@ -249,8 +305,10 @@ pub fn slider_bipolar(
 /// The momentary Strike control: the chip is swapped for a magenta
 /// `Strike ↓ / •` button and the readback line reads `HOLD n x.xxx` in
 /// magenta. Held at 1.0 only while pressed; released to 0.0 on pointer
-/// release, cancel, or focus loss (all covered by
-/// `is_pointer_button_down_on`). The held flag is owned by the editor.
+/// release or cancel (`is_pointer_button_down_on` covers those). Focus
+/// loss and a mid-hold kind change are the editor's job: it must call
+/// `set_once(..., 0.0)` and clear the held flag (see `foley-ambience`).
+/// The held flag is owned by the editor.
 pub fn strike(
     ui: &mut Ui,
     param: &FloatParam,
@@ -259,7 +317,7 @@ pub fn strike(
     label: &str,
     down: &mut bool,
 ) {
-    let wid = id(salt, label);
+    let wid = id(salt, "strike");
     let n = param.unmodulated_normalized_value();
     control_box(ui, wid, label, |ui, inner| {
         let chip_rect = Rect::from_min_size(
@@ -282,10 +340,10 @@ pub fn strike(
             let is_down = r.is_pointer_button_down_on();
             if is_down && !*down {
                 *down = true;
-                setter.set_parameter_normalized(param, 1.0);
+                set_once(setter, param, 1.0);
             } else if *down && !is_down {
                 *down = false;
-                setter.set_parameter_normalized(param, 0.0);
+                set_once(setter, param, 0.0);
             }
         });
         draw_track(ui, track_row_rect(inner), segment_fills(n), false);
@@ -327,7 +385,7 @@ fn stepper_inner(
                     .add_sized(Vec2::new(18.0, ROW_H), egui::Button::new("−"))
                     .clicked()
                 {
-                    setter.set_parameter(param, param.previous_step(cur, false));
+                    set_once(setter, param, param.previous_step(cur, false));
                 }
                 let field_w = (row.width() - 36.0 - 12.0).max(24.0);
                 value_field(ui, param, setter, Vec2::new(field_w, ROW_H), |n| {
@@ -345,7 +403,7 @@ fn stepper_inner(
                     .add_sized(Vec2::new(18.0, ROW_H), egui::Button::new("+"))
                     .clicked()
                 {
-                    setter.set_parameter(param, param.next_step(cur, false));
+                    set_once(setter, param, param.next_step(cur, false));
                 }
             });
         });
@@ -361,7 +419,7 @@ pub fn stepper(
     salt: impl std::hash::Hash + Copy + std::fmt::Debug,
     label: &str,
 ) {
-    let uid = id(salt, label);
+    let uid = id(salt, "stepper");
     stepper_inner(ui, uid, param, setter, label, false);
 }
 
@@ -373,7 +431,7 @@ pub fn note_stepper(
     salt: impl std::hash::Hash + Copy + std::fmt::Debug,
     label: &str,
 ) {
-    let uid = id(salt, label);
+    let uid = id(salt, "note");
     stepper_inner(ui, uid, param, setter, label, true);
 }
 
@@ -386,7 +444,7 @@ pub fn selector<T: Enum + PartialEq + Copy + 'static>(
     salt: impl std::hash::Hash + Copy + std::fmt::Debug,
     label: &str,
 ) {
-    let wid = id(salt, label);
+    let wid = id(salt, "selector");
     let variants = T::variants();
     let n = param.unmodulated_normalized_value();
     control_box(ui, wid, label, |ui, inner| {
@@ -402,7 +460,7 @@ pub fn selector<T: Enum + PartialEq + Copy + 'static>(
                     }
                 });
             if sel != idx {
-                setter.set_parameter(param, T::from_index(sel));
+                set_once(setter, param, T::from_index(sel));
             }
         });
         readback_at(ui.painter(), inner, &readback(n), theme::ACCENT_CYAN);
@@ -418,7 +476,7 @@ pub fn toggle(
     salt: impl std::hash::Hash + Copy + std::fmt::Debug,
     label: &str,
 ) {
-    let wid = id(salt, label);
+    let wid = id(salt, "toggle");
     let on = param.value();
     control_box(ui, wid, label, |ui, inner| {
         ui.scope_builder(UiBuilder::new().max_rect(editor_row_rect(inner)), |ui| {
@@ -435,7 +493,7 @@ pub fn toggle(
                 )
                 .clicked()
             {
-                setter.set_parameter(param, !on);
+                set_once(setter, param, !on);
             }
         });
         readback_at(

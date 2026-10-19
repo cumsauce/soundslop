@@ -36,3 +36,16 @@ fn snapshot_without_geometry_loads_unchanged() {
     assert!(preset::from_json(r#"{"version":"0.1.0","params":{},"fields":{}}"#).is_some());
     assert!(preset::from_json("not json").is_none());
 }
+
+#[test]
+fn legacy_snapshot_editor_state_is_stripped_on_load() {
+    // Snapshots written before this contract carried editor geometry; loading
+    // one must not resize the window.
+    let legacy = r#"{"version":"0.1.0","params":{},"fields":{"editor-state":"{\"width\":576.0,\"height\":720.0}"}}"#;
+
+    let loaded = preset::from_json(legacy).expect("snapshot parses");
+    assert!(
+        !loaded.fields.contains_key("editor-state"),
+        "editor geometry is dropped on load too"
+    );
+}

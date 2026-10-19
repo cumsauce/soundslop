@@ -2,6 +2,7 @@
 //! Ambience editors are built from (per the UI contract).
 
 pub mod fonts;
+pub mod gesture;
 pub mod metrics;
 pub mod preset;
 pub mod theme;

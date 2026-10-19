@@ -4,9 +4,9 @@ use foley_engine::{GainGuard, Motion, OnePoleLpf, layer_cutoff, pan_gains};
 fn pan_gains_pins() {
     let near = |a: f32, b: f32| (a - b).abs() < 1e-6;
     assert!(near(pan_gains(-90.0).0, 1.0) && near(pan_gains(-90.0).1, 0.0));
-    assert!((pan_gains(0.0).0 - 0.7071).abs() < 1e-3);
+    assert!((pan_gains(0.0).0 - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-3);
     assert!(near(pan_gains(90.0).0, 0.0) && near(pan_gains(90.0).1, 1.0));
-    assert!((pan_gains(180.0).0 + 0.7071).abs() < 1e-3);
+    assert!((pan_gains(180.0).0 + std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-3);
 }
 
 #[test]

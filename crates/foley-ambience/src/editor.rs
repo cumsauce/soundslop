@@ -23,8 +23,9 @@ const LAYERS: usize = 6;
 
 /// The egui application state for Ambience. Tracks whether each layer's
 /// Strike button was held on the previous frame so a 1.0 press and a 0.0
-/// release are emitted exactly once (the flag is handed to `widgets::strike`,
-/// which also releases on pointer cancel/focus loss).
+/// release are emitted exactly once (`widgets::strike` releases on pointer
+/// release/cancel; the editor force-releases on focus loss and on a kind
+/// change away from Thunder).
 pub struct AmbienceEditor {
     params: Arc<AmbienceParams>,
     gui_ctx: Option<GuiContext>,
@@ -76,6 +77,42 @@ impl NiceEguiApp for AmbienceEditor {
         };
         let setter = ctx.param_setter();
         let p = &self.params;
+
+        // Strike must never stick at 1.0. `is_pointer_button_down_on` covers
+        // pointer release and cancel, but a mouse-up that lands on another
+        // app (focus loss) never reaches us, and a mid-hold kind change away
+        // from Thunder would leave the flag set with the plain slider drawn.
+        // Both force-release knob B here, before the rack draws.
+        {
+            let knobs = [
+                &p.layer1.knob_b,
+                &p.layer2.knob_b,
+                &p.layer3.knob_b,
+                &p.layer4.knob_b,
+                &p.layer5.knob_b,
+                &p.layer6.knob_b,
+            ];
+            let beds = [
+                p.layer1.kind.value().to_bed_kind(),
+                p.layer2.kind.value().to_bed_kind(),
+                p.layer3.kind.value().to_bed_kind(),
+                p.layer4.kind.value().to_bed_kind(),
+                p.layer5.kind.value().to_bed_kind(),
+                p.layer6.kind.value().to_bed_kind(),
+            ];
+            let focus_lost = ui.input(|i| {
+                i.events
+                    .iter()
+                    .any(|e| matches!(e, egui::Event::WindowFocused(false)))
+            });
+            for i in 0..LAYERS {
+                let kind_flipped = beds[i] != Some(BedKind::Thunder);
+                if self.strike_down[i] && (focus_lost || kind_flipped) {
+                    self.strike_down[i] = false;
+                    widgets::set_once(&setter, knobs[i], 0.0);
+                }
+            }
+        }
 
         ResizableWindow::new("soundslop-ambience")
             .min_size(Vec2::new(theme::WINDOW_MIN.0, theme::WINDOW_MIN.1))

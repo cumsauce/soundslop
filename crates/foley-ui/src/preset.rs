@@ -12,6 +12,10 @@ pub fn to_json(mut state: PluginState) -> Option<String> {
 
 /// Parse a snapshot for Load…; absent persisted fields keep their current
 /// values (nice-plug only applies the fields present in the snapshot).
+/// Editor geometry is stripped here too: snapshots written before this
+/// contract carried it, and loading one must not resize the window.
 pub fn from_json(json: &str) -> Option<PluginState> {
-    serde_json::from_str(json).ok()
+    let mut state: PluginState = serde_json::from_str(json).ok()?;
+    state.fields.remove("editor-state");
+    Some(state)
 }

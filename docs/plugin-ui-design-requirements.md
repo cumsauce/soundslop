@@ -117,7 +117,7 @@ These **do not** constrain your visual design — the framework supports custom 
 ## Success Criteria
 
 The design is complete when:
-1. Every parameter (83 for Kit, ~56 for Ambience) has a mapped control.
+1. Every parameter (83 for Kit, 68 for Ambience) has a mapped control.
 2. Dynamic label contexts are clearly indicated for the four context-dependent knobs.
 3. The Thunder "Strike" button is visually distinct from Knob B elsewhere but clearly occupies the same conceptual position.
 4. Save/Load (JSON) and preset recall are reachable without hunting.
