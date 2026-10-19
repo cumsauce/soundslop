@@ -11,9 +11,9 @@ publish = false
 unsafe_code = "deny"
 
 [workspace.dependencies]
-foley-math = { git = "https://github.com/cumsauce/foley", rev = "4b153c6" }
-foley-dsp = { git = "https://github.com/cumsauce/foley", rev = "4b153c6" }
-foley-synth = { git = "https://github.com/cumsauce/foley", rev = "4b153c6" }
+foley-math = { git = "https://github.com/cumsauce/foley", rev = "78b6dcf" }
+foley-dsp = { git = "https://github.com/cumsauce/foley", rev = "78b6dcf" }
+foley-synth = { git = "https://github.com/cumsauce/foley", rev = "78b6dcf" }
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
 nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
 nih_plug_xtask = { git = "https://github.com/robbert-vdh/nih-plug", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
